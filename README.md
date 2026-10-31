@@ -1,40 +1,81 @@
-# shigley-calc
+<h1 align="center">shigley-calc</h1>
 
-Small, dependency-free JavaScript calculators for a few classic machine-element problems, written in the
-notation that most machine-design courses use (Shigley-style symbols):
+<p align="center">
+  <b>Machine-element calculators in Shigley notation: endurance limit, fatigue criteria, shaft diameters and eccentric bolt groups.<br>
+  A tested, dependency-free JavaScript library, plus an offline web page that shows every intermediate value.</b>
+</p>
 
-- **Endurance limit**: the uncorrected endurance limit and the Marin modification factors.
-- **Fatigue criteria**: factors of safety for fluctuating stress (Goodman, Soderberg, Gerber, ASME-elliptic,
-  Langer first-cycle yield) and the von Mises combination of bending and torsion.
-- **Shafts**: static (distortion-energy) and fatigue (DE-Goodman, DE-Soderberg, DE-Gerber, DE-ASME-elliptic)
-  diameters for a target factor of safety, and the factor of safety for a given diameter.
-- **Bolt groups**: an eccentrically loaded bolt (or rivet) group in shear: centroid, primary and secondary
-  shear, resultant on every bolt, and the critical bolt.
+<p align="center">
+  <a href="https://github.com/yuroka-studio/shigley-calc/actions/workflows/ci.yml"><img src="https://github.com/yuroka-studio/shigley-calc/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="license: MIT">
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="dependencies: 0">
+  <img src="https://img.shields.io/badge/node-%3E%3D22-informational" alt="node >= 22">
+</p>
 
-It is plain ES modules with JSDoc, no build step and no runtime dependencies. There is also a single-file
-offline demo page (`index.html`) with a form for each calculator that shows the intermediate values.
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#what-it-calculates">Calculators</a> ·
+  <a href="#examples">Examples</a> ·
+  <a href="#equations">Equations</a> ·
+  <a href="#türkçe">Türkçe</a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.webp">
+    <img src="docs/screenshot-light.webp" alt="The endurance-limit form of the demo page: inputs for Sut, surface finish, loading, section, diameter, temperature and reliability, and a table of every Marin factor ending in the corrected endurance limit Se = 212.62 MPa" width="760">
+  </picture>
+</p>
 
 > **Educational tool.** Read the [disclaimer](#disclaimer) before relying on any number from this library.
 
-## Requirements
+## What it calculates
 
-Node.js 22 or newer (for `node --test` and ES modules) or any current browser.
+| Calculator | You give | You get |
+| --- | --- | --- |
+| **Endurance limit** | `Sut`, surface finish, size, load type, temperature, reliability | `Se'`, every Marin factor (`ka` to `ke`), corrected `Se` |
+| **Fatigue criteria** | `σa` and `σm` (or `σmax` and `σmin`), `Se`, `Sut`, `Sy` | factor of safety for Goodman, Soderberg, Gerber, ASME-elliptic and Langer |
+| **Shaft, static** | `M`, `T`, `Sy`, target `n` | diameter, or the factor of safety at a given diameter |
+| **Shaft, fatigue** | `Ma`, `Mm`, `Ta`, `Tm`, `Kf`, `Kfs`, `Se` (a number or a function of `d`), `Sut`, `Sy`, target `n` | DE-Goodman, DE-Soderberg, DE-Gerber and DE-ASME-elliptic diameters, or the factors of safety at a given diameter |
+| **Bolt group in shear** | bolt positions, the force and its line of action, an optional couple | centroid, primary and secondary shear on every bolt, the critical bolt |
 
-## Use
+Every function is pure and returns its intermediate values too, so you can check a result step by step. Invalid input (a negative stress, an unknown surface finish, a diameter outside the validity range, ...) throws a `RangeError` that names the parameter.
 
-Clone the repository and import from `src/index.mjs`:
+## Quickstart
 
-```js
-import { enduranceLimit, deGoodmanDiameter } from './src/index.mjs';
+**The web page.** Browsers refuse to load ES modules from `file://` URLs, so serve the folder over http:
+
+```sh
+git clone https://github.com/yuroka-studio/shigley-calc
+cd shigley-calc
+npm start          # http://127.0.0.1:8080/ (or: python3 -m http.server 8080)
 ```
 
-Every function is pure and throws a `RangeError` with a message naming the offending parameter when an input
-is invalid (negative stress, unknown surface finish, diameter outside the validity range, and so on).
+The page makes no network requests and follows your light or dark theme. If the modules can't load, it shows a banner that explains why. It also works unchanged on any static host such as GitHub Pages.
 
-### Units
+**The library.** Node.js 22 or newer, or any current browser. Plain ES modules with JSDoc, no build step.
 
-Everything is SI with the units that keep the arithmetic consistent (N/mm² = MPa), so there are no hidden
-conversions inside the library.
+```sh
+npm install github:yuroka-studio/shigley-calc
+```
+
+```js
+import { enduranceLimit, deGoodmanDiameter } from 'shigley-calc';
+
+// Ma = 120 N·m bending, Tm = 80 N·m steady torque, machined steel with Sut = 600 MPa,
+// 99 % reliability, design factor 2. Se depends on d, so pass a function and the library iterates.
+deGoodmanDiameter({
+  Ma: 120e3, Tm: 80e3, Kf: 1.7, Kfs: 1.5, Sut: 600, n: 2,
+  Se: (d) => enduranceLimit({ Sut: 600, finish: 'machined', d, reliability: 0.99 }).Se,
+});
+// { criterion: 'goodman', d: 30.13, A: 408000, B: 207846, Se: 174.52, iterations: 8 }
+```
+
+From a clone, import from `./src/index.mjs` instead.
+
+## Units
+
+Everything is SI with the units that keep the arithmetic consistent (N/mm² = MPa), so there are no hidden conversions inside the library.
 
 | Quantity | Unit |
 | --- | --- |
@@ -50,7 +91,7 @@ conversions inside the library.
 ### Endurance limit (`endurance.mjs`)
 
 ```js
-import { enduranceLimit } from './src/index.mjs';
+import { enduranceLimit } from 'shigley-calc';
 
 const marin = enduranceLimit({
   Sut: 700,            // MPa
@@ -69,7 +110,7 @@ The individual factors are exported too: `uncorrectedEnduranceLimit`, `surfaceFa
 ### Fatigue criteria (`fatigue.mjs`)
 
 ```js
-import { stressComponents, fluctuatingSafetyFactors } from './src/index.mjs';
+import { stressComponents, fluctuatingSafetyFactors } from 'shigley-calc';
 
 const { sigmaA, sigmaM } = stressComponents(150, 10); // sigmaMax, sigmaMin  ->  70, 80 MPa
 fluctuatingSafetyFactors({ sigmaA, sigmaM, Se: 212.6, Sut: 700, Sy: 560 });
@@ -82,7 +123,7 @@ fluctuatingSafetyFactors({ sigmaA, sigmaM, Se: 212.6, Sut: 700, Sy: 560 });
 ### Shafts (`shaft.mjs`)
 
 ```js
-import { staticShaftDiameter, deGoodmanDiameter, shaftFatigueSafetyFactor, enduranceLimit } from './src/index.mjs';
+import { staticShaftDiameter, deGoodmanDiameter, shaftFatigueSafetyFactor, enduranceLimit } from 'shigley-calc';
 
 // Static: moments in N*mm
 staticShaftDiameter({ M: 100e3, T: 200e3, Sy: 350, n: 2.5 }).d;      // 24.41 mm
@@ -109,7 +150,7 @@ shaftFatigueSafetyFactor({ Ma: 100e3, Tm: 60e3, Kf: 1.6, Kfs: 1.4, d: 30, Se: 15
 ### Bolt group (`bolts.mjs`)
 
 ```js
-import { eccentricBoltGroup, boltShearStress } from './src/index.mjs';
+import { eccentricBoltGroup, boltShearStress } from 'shigley-calc';
 
 const group = eccentricBoltGroup({
   bolts: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 200, y: 0 }], // mm; add `area` for unequal bolts
@@ -127,24 +168,32 @@ Each entry of `group.bolts` carries its position relative to the centroid, the p
 
 ## Equations
 
-Symbols follow the usual textbook notation. Stresses and strengths are in MPa, lengths in mm.
+Symbols follow the usual textbook notation. Stresses and strengths are in MPa, lengths in mm. Click a section to open it.
 
-### Endurance limit
+<details>
+<summary><b>Endurance limit</b> (Marin factors)</summary>
 
+```math
+S_e = k_a\,k_b\,k_c\,k_d\,k_e\,k_{misc}\,S_e'
+\qquad
+S_e' = \begin{cases} 0.5\,S_{ut} & S_{ut} \le 1400\ \text{MPa} \\ 700\ \text{MPa} & S_{ut} > 1400\ \text{MPa} \end{cases}
+\qquad
+k_a = a\,S_{ut}^{\,b}
 ```
-Se  = ka kb kc kd ke kMisc Se'
 
-Se' = 0.5 Sut             for Sut <= 1400 MPa
-Se' = 700 MPa             for Sut >  1400 MPa
-ka  = a Sut^b             (a, b by surface finish, below)
-kb  = (de / 7.62)^-0.107  for 2.79 <= de <= 51 mm
-kb  = 1.51 de^-0.157      for 51 < de <= 254 mm          (rotating round, bending or torsion)
-kb  = 1                   for axial loading
-de  = d (rotating round) | 0.370 d (non-rotating round) | 0.808 sqrt(h b) (rectangle)
-kc  = 1 (bending) | 0.85 (axial) | 0.59 (torsion)
-kd  = table of tensile-strength ratio vs temperature, linearly interpolated (20-600 degC)
-ke  = table of reliability factors, or 1 - 0.08 za
+```math
+k_b = \begin{cases} (d_e/7.62)^{-0.107} & 2.79 \le d_e \le 51\ \text{mm} \\ 1.51\,d_e^{-0.157} & 51 < d_e \le 254\ \text{mm} \\ 1 & \text{axial loading} \end{cases}
+\qquad
+d_e = \begin{cases} d & \text{rotating round} \\ 0.370\,d & \text{non-rotating round} \\ 0.808\sqrt{h\,b} & \text{rectangle} \end{cases}
 ```
+
+```math
+k_c = \begin{cases} 1 & \text{bending} \\ 0.85 & \text{axial} \\ 0.59 & \text{torsion} \end{cases}
+\qquad
+k_e = 1 - 0.08\,z_a
+```
+
+`kb` uses the rotating-round expressions for bending or torsion. `kd` comes from a table of tensile-strength ratio against temperature, linearly interpolated between 20 and 600 °C. `ke` comes from the reliability table, or from `za` as above.
 
 | symbol | meaning | unit |
 | --- | --- | --- |
@@ -171,19 +220,33 @@ Reliability factors: 50 % → 1.000, 90 % → 0.897, 95 % → 0.868, 99 % → 0.
 `kc = 0.59` is for pure torsional fatigue. When bending and torsion act together and are combined through the
 von Mises expressions below, use `load: 'bending'` (`kc = 1`) so the torsion is not penalised twice.
 
-### Fluctuating stress
+</details>
 
+<details>
+<summary><b>Fluctuating stress</b> (Goodman, Soderberg, Gerber, ASME-elliptic, Langer)</summary>
+
+```math
+\sigma_a = \frac{|\sigma_{max} - \sigma_{min}|}{2}
+\qquad
+\sigma_m = \frac{\sigma_{max} + \sigma_{min}}{2}
 ```
-sigmaA = |sigmaMax - sigmaMin| / 2           sigmaM = (sigmaMax + sigmaMin) / 2
 
-Goodman     1/n = sigmaA/Se + sigmaM/Sut
-Soderberg   1/n = sigmaA/Se + sigmaM/Sy
-Gerber      n sigmaA/Se + (n sigmaM/Sut)^2 = 1
-ASME        (n sigmaA/Se)^2 + (n sigmaM/Sy)^2 = 1
-Langer      n = Sy / (sigmaA + sigmaM)                       (first-cycle yield)
+```math
+\begin{aligned}
+\text{Goodman:}\quad & \frac{1}{n} = \frac{\sigma_a}{S_e} + \frac{\sigma_m}{S_{ut}} \\
+\text{Soderberg:}\quad & \frac{1}{n} = \frac{\sigma_a}{S_e} + \frac{\sigma_m}{S_y} \\
+\text{Gerber:}\quad & \frac{n\,\sigma_a}{S_e} + \left(\frac{n\,\sigma_m}{S_{ut}}\right)^2 = 1 \\
+\text{ASME-elliptic:}\quad & \left(\frac{n\,\sigma_a}{S_e}\right)^2 + \left(\frac{n\,\sigma_m}{S_y}\right)^2 = 1 \\
+\text{Langer (first-cycle yield):}\quad & n = \frac{S_y}{\sigma_a + \sigma_m}
+\end{aligned}
+```
 
-Kf = 1 + q (Kt - 1)
-sigmaA' = sqrt((Kf sigmaA)^2 + 3 (Kfs tauA)^2)      sigmaM' = sqrt((Kf sigmaM)^2 + 3 (Kfs tauM)^2)
+```math
+K_f = 1 + q\,(K_t - 1)
+\qquad
+\sigma_a' = \sqrt{(K_f\,\sigma_a)^2 + 3\,(K_{fs}\,\tau_a)^2}
+\qquad
+\sigma_m' = \sqrt{(K_f\,\sigma_m)^2 + 3\,(K_{fs}\,\tau_m)^2}
 ```
 
 | symbol | meaning | unit |
@@ -199,23 +262,54 @@ The criteria describe the first quadrant of the mean/alternating plane, so both 
 non-negative. The Gerber factor is evaluated in an algebraically equivalent form that stays accurate when
 `sigmaM` is tiny.
 
-### Solid round shaft
+</details>
 
+<details>
+<summary><b>Solid round shaft</b> (static and DE fatigue criteria)</summary>
+
+```math
+\sigma = \frac{32\,M}{\pi d^3}
+\qquad
+\tau = \frac{16\,T}{\pi d^3}
 ```
-sigma = 32 M / (pi d^3)        tau = 16 T / (pi d^3)
 
-static:  sigma' = (16 / (pi d^3)) sqrt(4 M^2 + 3 T^2)       n = Sy / sigma'
-         d = [ (16 n / (pi Sy)) sqrt(4 M^2 + 3 T^2) ]^(1/3)
+Static (distortion energy):
 
-A = sqrt(4 (Kf Ma)^2 + 3 (Kfs Ta)^2)        B = sqrt(4 (Kf Mm)^2 + 3 (Kfs Tm)^2)
-sigmaA' = 16 A / (pi d^3)                   sigmaM' = 16 B / (pi d^3)
+```math
+\sigma' = \frac{16}{\pi d^3}\sqrt{4M^2 + 3T^2}
+\qquad
+n = \frac{S_y}{\sigma'}
+\qquad
+d = \left[\frac{16\,n}{\pi S_y}\sqrt{4M^2 + 3T^2}\right]^{1/3}
+```
 
-DE-Goodman    d = [ (16 n / pi) (A/Se + B/Sut) ]^(1/3)
-DE-Soderberg  d = [ (16 n / pi) (A/Se + B/Sy) ]^(1/3)
-DE-Gerber     d = [ (8 n A / (pi Se)) (1 + sqrt(1 + (2 B Se / (A Sut))^2)) ]^(1/3)
-DE-ASME       d = [ (16 n / pi) sqrt((A/Se)^2 + (B/Sy)^2) ]^(1/3)
+Fatigue:
 
-first-cycle yield:  sigmaMax' = (16 / (pi d^3)) sqrt(4 (Kf (Ma+Mm))^2 + 3 (Kfs (Ta+Tm))^2),  n = Sy / sigmaMax'
+```math
+A = \sqrt{4\,(K_f M_a)^2 + 3\,(K_{fs} T_a)^2}
+\qquad
+B = \sqrt{4\,(K_f M_m)^2 + 3\,(K_{fs} T_m)^2}
+\qquad
+\sigma_a' = \frac{16A}{\pi d^3}
+\qquad
+\sigma_m' = \frac{16B}{\pi d^3}
+```
+
+```math
+\begin{aligned}
+\text{DE-Goodman:}\quad & d = \left[\frac{16n}{\pi}\left(\frac{A}{S_e} + \frac{B}{S_{ut}}\right)\right]^{1/3} \\
+\text{DE-Soderberg:}\quad & d = \left[\frac{16n}{\pi}\left(\frac{A}{S_e} + \frac{B}{S_y}\right)\right]^{1/3} \\
+\text{DE-Gerber:}\quad & d = \left[\frac{8nA}{\pi S_e}\left(1 + \sqrt{1 + \left(\frac{2BS_e}{AS_{ut}}\right)^2}\right)\right]^{1/3} \\
+\text{DE-ASME-elliptic:}\quad & d = \left[\frac{16n}{\pi}\sqrt{\left(\frac{A}{S_e}\right)^2 + \left(\frac{B}{S_y}\right)^2}\right]^{1/3}
+\end{aligned}
+```
+
+First-cycle yield:
+
+```math
+\sigma_{max}' = \frac{16}{\pi d^3}\sqrt{4\left[K_f\,(M_a + M_m)\right]^2 + 3\left[K_{fs}\,(T_a + T_m)\right]^2}
+\qquad
+n_y = \frac{S_y}{\sigma_{max}'}
 ```
 
 | symbol | meaning | unit |
@@ -229,17 +323,34 @@ The DE-Gerber diameter is computed from the equivalent form `K = ½ (A/Se + sqrt
 `d = [(16 n / π) K]^(1/3)`, which stays finite when `A = 0`. When `Se` is a function of `d`, the diameter is
 found by fixed-point iteration (it throws if it fails to converge within 100 steps).
 
-### Bolt group in shear
+</details>
 
-```
-(xbar, ybar) = area-weighted centroid of the bolts
-M       = (xF - xbar) Fy - (yF - ybar) Fx + couple          (about the centroid, CCW positive)
-F'_i    = F A_i / sum(A)                                    primary (direct) shear
-F''_i   = M A_i r_i / sum(A_j r_j^2), perpendicular to r_i  secondary (moment) shear
-R_i     = F'_i + F''_i  (vector sum)                        critical bolt: largest |R_i|
+<details>
+<summary><b>Bolt group in shear</b> (eccentric loading)</summary>
 
-tau     = R / (pi d^2 / 4)         sigma_b = R / (d t)
+```math
+\bar{x} = \frac{\sum_i A_i\,x_i}{\sum_i A_i}
+\qquad
+\bar{y} = \frac{\sum_i A_i\,y_i}{\sum_i A_i}
+\qquad
+M = (x_F - \bar{x})\,F_y - (y_F - \bar{y})\,F_x + M_{couple}
 ```
+
+```math
+\vec{F}_i' = \frac{A_i}{\sum_j A_j}\,\vec{F}
+\qquad
+F_i'' = \frac{M\,A_i\,r_i}{\sum_j A_j\,r_j^2}\ \ \text{perpendicular to } \vec{r}_i
+\qquad
+\vec{R}_i = \vec{F}_i' + \vec{F}_i''
+```
+
+```math
+\tau = \frac{R}{\pi d^2/4}
+\qquad
+\sigma_b = \frac{R}{d\,t}
+```
+
+The moment is taken about the centroid, counter-clockwise positive. The critical bolt is the one with the largest `|R_i|`.
 
 | symbol | meaning | unit |
 | --- | --- | --- |
@@ -255,21 +366,7 @@ tau     = R / (pi d^2 / 4)         sigma_b = R / (d t)
 Assumptions: rigid joint plate, all bolts in single shear, equal shear stiffness per unit area, and no
 friction between the plates.
 
-## Demo page
-
-`index.html` is a single static page with a form per calculator. It makes no network requests and picks its
-light or dark theme from `prefers-color-scheme`.
-
-Browsers refuse to load ES modules from `file://` URLs, so serve the folder over http:
-
-```sh
-npm start                      # node scripts/serve.mjs, http://127.0.0.1:8080/
-# or any static server, for example:
-python3 -m http.server 8080
-```
-
-If the modules cannot be loaded the page shows a banner that explains this. The page also works unchanged on
-any static host such as GitHub Pages.
+</details>
 
 ## Tests
 
@@ -322,6 +419,31 @@ a real design.
 
 This project is not affiliated with, endorsed by or sponsored by the authors or publisher of any textbook it
 cites.
+
+## Türkçe
+
+Makine elemanları için küçük, bağımlılıksız hesaplayıcılar. Gösterim Shigley ile aynı:
+
+- Marin faktörleriyle düzeltilmiş **yorulma dayanımı** (`Se`);
+- **Goodman, Soderberg, Gerber, ASME-eliptik ve Langer** emniyet katsayıları;
+- statik ve yorulma için **mil çapı** (DE kriterleri);
+- eksantrik yüklü **cıvata grupları**: birincil ve ikincil kesme, en çok zorlanan cıvata.
+
+Her sonuç ara değerleriyle birlikte gelir, böylece kendi el hesabınızı adım adım karşılaştırabilirsiniz.
+
+- **Sayfayı açmak:** `npm start`, ardından http://127.0.0.1:8080/. İnternet bağlantısı gerekmez.
+- **Birimler:** MPa, mm, N, N·mm. Sayfa momentleri N·m olarak alır ve kendisi çevirir.
+- **Kaynak:** *Shigley's Mechanical Engineering Design*, 10. baskı. Tablo numaraları ve katsayılar baskıdan baskıya değişebilir; kendi baskınızla karşılaştırın.
+- **Eğitim amaçlıdır.** Gerçek bir tasarımda her sonucu elle, ilgili standartlara göre ve bir mühendisle doğrulayın.
+
+## More from Yuroka Studio
+
+Small, offline tools with no paid services, all MIT:
+
+- [nightshift-agents](https://github.com/yuroka-studio/nightshift-agents): scheduled coding agents that take one task from a backlog and open a pull request with real test evidence.
+- [waveform-peaks](https://github.com/yuroka-studio/waveform-peaks): turn songs into compact waveform data for web players.
+- [type-cover](https://github.com/yuroka-studio/type-cover): deterministic, code-generated typographic cover art.
+- [play-dev-site](https://github.com/yuroka-studio/play-dev-site): a static developer website with the privacy and account-deletion pages Google Play asks for.
 
 ## License
 
