@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Offline machine-element calculators: Marin endurance limit, fatigue criteria, shaft diameter and eccentric bolt groups.">
+<title>shigley-calc | machine-element calculators</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --fg: #14181f;
+    --muted: #4b5563;
+    --border: #d5d9e0;
+    --accent: #0b5cad;
+    --accent-fg: #ffffff;
+    --accent-soft: #e4effa;
+    --good: #0f6b3a;
+    --bad: #a3202c;
+    --focus: #1a73e8;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1318;
+      --surface: #171c23;
+      --fg: #e6e9ee;
+      --muted: #a3adbb;
+      --border: #2b333e;
+      --accent: #6cb2f5;
+      --accent-fg: #0b1118;
+      --accent-soft: #1b2a3b;
+      --good: #5fd08f;
+      --bad: #ff8a93;
+      --focus: #8ab4f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.5 var(--sans);
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1rem 3rem; }
+  .skip { position: absolute; left: -999px; top: 0; background: var(--accent); color: var(--accent-fg); padding: .5rem 1rem; z-index: 10; }
+  .skip:focus { left: 0; }
+  header { padding: 2rem 0 1rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.75rem; letter-spacing: -.01em; }
+  h2 { margin: 0 0 .25rem; font-size: 1.25rem; }
+  h3 { margin: 1.25rem 0 .5rem; font-size: 1rem; }
+  p { margin: .25rem 0 .75rem; }
+  .lede, .hint, .unit, caption, .note { color: var(--muted); }
+  .hint { font-size: .875rem; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  nav[aria-label] ul { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 1rem 0 0; }
+  nav[aria-label] a {
+    display: inline-block; padding: .35rem .8rem; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--surface); text-decoration: none; color: var(--fg); font-size: .9rem;
+  }
+  nav[aria-label] a:hover { border-color: var(--accent); }
+  .banner {
+    border: 1px solid var(--bad); background: var(--surface); color: var(--fg);
+    border-left-width: 6px; border-radius: 6px; padding: .75rem 1rem; margin: 1rem 0;
+  }
+  .banner[hidden] { display: none; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.25rem; margin: 1.5rem 0; scroll-margin-top: 1rem;
+  }
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  legend { padding: 0; font-weight: 600; margin-bottom: .5rem; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); gap: .75rem 1rem; }
+  .field { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+  .field[hidden] { display: none; }
+  .field.wide { grid-column: 1 / -1; }
+  label { font-size: .9rem; font-weight: 600; }
+  .unit { font-weight: 400; }
+  input, select, textarea {
+    font: inherit; color: var(--fg); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: .45rem .55rem; width: 100%;
+  }
+  textarea { font-family: var(--mono); font-size: .9rem; resize: vertical; }
+  input:invalid { border-color: var(--bad); }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: .45rem .9rem;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg);
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  .results { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: .5rem; }
+  .error { color: var(--bad); font-weight: 600; margin: .75rem 0 0; }
+  table { width: 100%; border-collapse: collapse; margin: .25rem 0 .75rem; font-size: .95rem; }
+  caption { text-align: left; font-weight: 600; padding: .5rem 0 .25rem; color: var(--fg); }
+  th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--border); vertical-align: baseline; }
+  th { font-weight: 600; color: var(--muted); font-size: .85rem; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.sym { font-family: var(--mono); white-space: nowrap; }
+  tr.key td { background: var(--accent-soft); font-weight: 700; }
+  tr.critical td { background: var(--accent-soft); font-weight: 700; }
+  .scroll { overflow-x: auto; }
+  .ok { color: var(--good); font-weight: 700; }
+  .low { color: var(--bad); font-weight: 700; }
+  details { margin-top: .75rem; }
+  summary { cursor: pointer; font-weight: 600; }
+  pre, code { font-family: var(--mono); font-size: .875rem; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; overflow-x: auto; margin: .5rem 0; }
+  footer { color: var(--muted); font-size: .875rem; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 2rem; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (max-width: 30rem) { .card { padding: 1rem; } th, td { padding: .3rem .25rem; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the calculators</a>
+<div class="wrap">
+  <header>
+    <h1>shigley-calc</h1>
+    <p class="lede">Small machine-element calculators in Shigley-style notation. Everything runs in your browser, with no network requests. Each result shows the intermediate values, not just the final number.</p>
+    <nav aria-label="Calculators">
+      <ul>
+        <li><a href="#endurance">Endurance limit</a></li>
+        <li><a href="#fluctuating">Fluctuating stress</a></li>
+        <li><a href="#shaft-static">Shaft (static)</a></li>
+        <li><a href="#shaft-fatigue">Shaft (fatigue)</a></li>
+        <li><a href="#bolts">Bolt group</a></li>
+      </ul>
+    </nav>
+    <div id="load-error" class="banner" role="alert" hidden>
+      <strong>The calculation modules could not be loaded.</strong>
+      Browsers block ES modules on <code>file://</code> pages. Serve this folder over http instead:
+      run <code>npm start</code> (or <code>python3 -m http.server 8080</code>) in the project folder and open
+      <code>http://127.0.0.1:8080/</code>.
+    </div>
+    <noscript><div class="banner" role="alert">This page needs JavaScript to run the calculations.</div></noscript>
+  </header>
+
+  <main id="main">
+
+    <!-- 1. Endurance limit -->
+    <section class="card" id="endurance" aria-labelledby="h-endurance">
+      <h2 id="h-endurance">Endurance limit (Marin factors)</h2>
+      <p class="hint">Se = ka &middot; kb &middot; kc &middot; kd &middot; ke &middot; kMisc &middot; Se&prime;, steel, MPa and mm.</p>
+      <form id="form-endurance" autocomplete="off" novalidate>
+        <fieldset>
+          <legend>Material and surface</legend>
+          <div class="fields">
+            <div class="field"><label for="en-sut">Ultimate strength Sut <span class="unit">(MPa)</span></label>
+              <input id="en-sut" name="sut" type="number" step="any" min="0" inputmode="decimal" value="700" required></div>
+            <div class="field"><label for="en-finish">Surface finish</label>
+              <select id="en-finish" name="finish">
+                <option value="ground">Ground</option>
+                <option value="machined" selected>Machined</option>
+                <option value="cold-drawn">Cold-drawn</option>
+                <option value="hot-rolled">Hot-rolled</option>
+                <option value="as-forged">As-forged</option>
+              </select></div>
+            <div class="field"><label for="en-load">Loading</label>
+              <select id="en-load" name="load" aria-describedby="en-load-hint">
+                <option value="bending" selected>Bending (kc = 1)</option>
+                <option value="axial">Axial (kc = 0.85)</option>
+                <option value="torsion">Pure torsion (kc = 0.59)</option>
+              </select>
+              <span id="en-load-hint" class="hint">For combined bending and torsion through von Mises, choose bending.</span></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Size</legend>
+          <div class="fields">
+            <div class="field" data-size="shape"><label for="en-shape">Section</label>
+              <select id="en-shape" name="shape">
+                <option value="rotating" selected>Round, rotating (de = d)</option>
+                <option value="stationary">Round, non-rotating (de = 0.370 d)</option>
+                <option value="rectangle">Rectangle (de = 0.808 &radic;(h b))</option>
+              </select></div>
+            <div class="field" data-size="round"><label for="en-d">Diameter d <span class="unit">(mm)</span></label>
+              <input id="en-d" name="d" type="number" step="any" min="0" inputmode="decimal" value="25"></div>
+            <div class="field" data-size="rect" hidden><label for="en-h">Depth h <span class="unit">(mm)</span></label>
+              <input id="en-h" name="h" type="number" step="any" min="0" inputmode="decimal" value="30"></div>
+            <div class="field" data-size="rect" hidden><label for="en-b">Width b <span class="unit">(mm)</span></label>
+              <input id="en-b" name="b" type="number" step="any" min="0" inputmode="decimal" value="12"></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Environment</legend>
+          <div class="fields">
+            <div class="field"><label for="en-temp">Temperature <span class="unit">(&deg;C, 20 to 600)</span></label>
+              <input id="en-temp" name="temp" type="number" step="any" inputmode="decimal" placeholder="blank = room temperature">
+            </div>
+            <div class="field"><label for="en-rel">Reliability</label>
+              <select id="en-rel" name="reliability">
+                <option value="0.5">50 %</option>
+                <option value="0.9">90 %</option>
+                <option value="0.95" selected>95 %</option>
+                <option value="0.99">99 %</option>
+                <option value="0.999">99.9 %</option>
+                <option value="0.9999">99.99 %</option>
+                <option value="0.99999">99.999 %</option>
+                <option value="0.999999">99.9999 %</option>
+              </select></div>
+            <div class="field"><label for="en-misc">Miscellaneous kMisc <span class="unit">(&ndash;)</span></label>
+              <input id="en-misc" name="misc" type="number" step="any" min="0" inputmode="decimal" value="1"></div>
+          </div>
+        </fieldset>
+        <div class="results" id="out-endurance" role="status" aria-live="polite"></div>
+        <p><button type="button" class="secondary" id="use-se">Use this Se in the shaft fatigue form</button></p>
+      </form>
+      <details>
+        <summary>Equations</summary>
+        <pre>Se' = 0.5 Sut  (Sut &lt;= 1400 MPa),  Se' = 700 MPa otherwise
+ka  = a Sut^b           (surface, Sut in MPa)
+kb  = (de/7.62)^-0.107  for 2.79 &lt;= de &lt;= 51 mm;   1.51 de^-0.157 for 51 &lt; de &lt;= 254 mm
+kc  = 1 bending, 0.85 axial, 0.59 torsion
+kd  = temperature table (linear interpolation)
+ke  = reliability table</pre>
+      </details>
+    </section>
+
+    <!-- 2. Fluctuating stress -->
+    <section class="card" id="fluctuating" aria-labelledby="h-fluctuating">
+      <h2 id="h-fluctuating">Fluctuating stress: factors of safety</h2>
+      <p class="hint">Goodman, Soderberg, Gerber and ASME-elliptic fatigue criteria plus Langer first-cycle yield. Stresses in MPa, both components non-negative.</p>
+      <form id="form-fluctuating" autocomplete="off" novalidate>
+        <fieldset>
+          <legend>Stresses and strengths</legend>
+          <div class="fields">
+            <div class="field"><label for="fl-sa">Alternating stress &sigma;a <span class="unit">(MPa)</span></label>
+              <input id="fl-sa" name="sa" type="number" step="any" min="0" inputmode="decimal" value="80" required></div>
+            <div class="field"><label for="fl-sm">Mean stress &sigma;m <span class="unit">(MPa)</span></label>
+              <input id="fl-sm" name="sm" type="number" step="any" min="0" inputmode="decimal" value="60" required></div>
+            <div class="field"><label for="fl-se">Endurance limit Se <span class="unit">(MPa)</span></label>
+              <input id="fl-se" name="se" type="number" step="any" min="0" inputmode="decimal" value="200" required></div>
+            <div class="field"><label for="fl-sut">Ultimate strength Sut <span class="unit">(MPa)</span></label>
+              <input id="fl-sut" name="sut" type="number" step="any" min="0" inputmode="decimal" value="600" required></div>
+            <div class="field"><label for="fl-sy">Yield strength Sy <span class="unit">(MPa)</span></label>
+              <input id="fl-sy" name="sy" type="number" step="any" min="0" inputmode="decimal" value="450" required></div>
+          </div>
+        </fieldset>
+        <div class="results" id="out-fluctuating" role="status" aria-live="polite"></div>
+      </form>
+      <details>
+        <summary>Equations</summary>
+        <pre>Goodman    1/n = &sigma;a/Se + &sigma;m/Sut
+Soderberg  1/n = &sigma;a/Se + &sigma;m/Sy
+Gerber     n &sigma;a/Se + (n &sigma;m/Sut)^2 = 1
+ASME       (n &sigma;a/Se)^2 + (n &sigma;m/Sy)^2 = 1
+Langer     n = Sy / (&sigma;a + &sigma;m)</pre>
+      </details>
+    </section>
+
+    <!-- 3. Static shaft -->
+    <section class="card" id="shaft-static" aria-labelledby="h-shaft-static">
+      <h2 id="h-shaft-static">Shaft: static yield (distortion energy)</h2>
+      <p class="hint">Solid round shaft, steady bending moment and torque. Moments in N&middot;m (converted to N&middot;mm internally).</p>
+      <form id="form-shaft-static" autocomplete="off" novalidate>
+        <fieldset>
+          <legend>Loads and material</legend>
+          <div class="fields">
+            <div class="field"><label for="ss-m">Bending moment M <span class="unit">(N&middot;m)</span></label>
+              <input id="ss-m" name="m" type="number" step="any" min="0" inputmode="decimal" value="100"></div>
+            <div class="field"><label for="ss-t">Torque T <span class="unit">(N&middot;m)</span></label>
+              <input id="ss-t" name="t" type="number" step="any" min="0" inputmode="decimal" value="200"></div>
+            <div class="field"><label for="ss-sy">Yield strength Sy <span class="unit">(MPa)</span></label>
+              <input id="ss-sy" name="sy" type="number" step="any" min="0" inputmode="decimal" value="350" required></div>
+            <div class="field"><label for="ss-n">Design factor n <span class="unit">(&ndash;)</span></label>
+              <input id="ss-n" name="n" type="number" step="any" min="0" inputmode="decimal" value="2.5" required></div>
+            <div class="field"><label for="ss-d">Check a diameter d <span class="unit">(mm, optional)</span></label>
+              <input id="ss-d" name="d" type="number" step="any" min="0" inputmode="decimal" value="25"></div>
+          </div>
+        </fieldset>
+        <div class="results" id="out-shaft-static" role="status" aria-live="polite"></div>
+      </form>
+      <details>
+        <summary>Equations</summary>
+        <pre>d = [ (16 n / (pi Sy)) sqrt(4 M^2 + 3 T^2) ]^(1/3)
+sigma' = (16 / (pi d^3)) sqrt(4 M^2 + 3 T^2),   n = Sy / sigma'</pre>
+      </details>
+    </section>
+
+    <!-- 4. Fatigue shaft -->
+    <section class="card" id="shaft-fatigue" aria-labelledby="h-shaft-fatigue">
+      <h2 id="h-shaft-fatigue">Shaft: fatigue (DE criteria)</h2>
+      <p class="hint">Diameter for a target design factor with DE-Goodman, DE-Soderberg, DE-Gerber and DE-ASME-elliptic, and factors of safety for a given diameter. Moments in N&middot;m.</p>
+      <form id="form-shaft-fatigue" autocomplete="off" novalidate>
+        <fieldset>
+          <legend>Load components</legend>
+          <div class="fields">
+            <div class="field"><label for="sf-ma">Alternating moment Ma <span class="unit">(N&middot;m)</span></label>
+              <input id="sf-ma" name="ma" type="number" step="any" min="0" inputmode="decimal" value="100"></div>
+            <div class="field"><label for="sf-mm">Mean moment Mm <span class="unit">(N&middot;m)</span></label>
+              <input id="sf-mm" name="mm" type="number" step="any" min="0" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="sf-ta">Alternating torque Ta <span class="unit">(N&middot;m)</span></label>
+              <input id="sf-ta" name="ta" type="number" step="any" min="0" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="sf-tm">Mean torque Tm <span class="unit">(N&middot;m)</span></label>
+              <input id="sf-tm" name="tm" type="number" step="any" min="0" inputmode="decimal" value="60"></div>
+            <div class="field"><label for="sf-kf">Kf, bending <span class="unit">(&ge; 1)</span></label>
+              <input id="sf-kf" name="kf" type="number" step="any" min="1" inputmode="decimal" value="1.6"></div>
+            <div class="field"><label for="sf-kfs">Kfs, torsion <span class="unit">(&ge; 1)</span></label>
+              <input id="sf-kfs" name="kfs" type="number" step="any" min="1" inputmode="decimal" value="1.4"></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Material and design factor</legend>
+          <div class="fields">
+            <div class="field"><label for="sf-se">Endurance limit Se <span class="unit">(MPa)</span></label>
+              <input id="sf-se" name="se" type="number" step="any" min="0" inputmode="decimal" value="150" required></div>
+            <div class="field"><label for="sf-sut">Ultimate strength Sut <span class="unit">(MPa)</span></label>
+              <input id="sf-sut" name="sut" type="number" step="any" min="0" inputmode="decimal" value="500" required></div>
+            <div class="field"><label for="sf-sy">Yield strength Sy <span class="unit">(MPa)</span></label>
+              <input id="sf-sy" name="sy" type="number" step="any" min="0" inputmode="decimal" value="380" required></div>
+            <div class="field"><label for="sf-n">Target design factor n <span class="unit">(&ndash;)</span></label>
+              <input id="sf-n" name="n" type="number" step="any" min="0" inputmode="decimal" value="2" required></div>
+            <div class="field"><label for="sf-d">Check a diameter d <span class="unit">(mm, optional)</span></label>
+              <input id="sf-d" name="d" type="number" step="any" min="0" inputmode="decimal" value="30"></div>
+          </div>
+        </fieldset>
+        <div class="results" id="out-shaft-fatigue" role="status" aria-live="polite"></div>
+      </form>
+      <details>
+        <summary>Equations</summary>
+        <pre>A = sqrt(4 (Kf Ma)^2 + 3 (Kfs Ta)^2)      B = sqrt(4 (Kf Mm)^2 + 3 (Kfs Tm)^2)
+Goodman    d = [ (16 n / pi) (A/Se + B/Sut) ]^(1/3)
+Soderberg  d = [ (16 n / pi) (A/Se + B/Sy) ]^(1/3)
+Gerber     d = [ (16 n / pi) * 0.5 (A/Se + sqrt((A/Se)^2 + 4 (B/Sut)^2)) ]^(1/3)
+ASME       d = [ (16 n / pi) sqrt((A/Se)^2 + (B/Sy)^2) ]^(1/3)
+sigma_a' = 16 A / (pi d^3),   sigma_m' = 16 B / (pi d^3)
+first-cycle yield: sigma_max' = (16/(pi d^3)) sqrt(4 (Kf (Ma+Mm))^2 + 3 (Kfs (Ta+Tm))^2)</pre>
+      </details>
+    </section>
+
+    <!-- 5. Bolt group -->
+    <section class="card" id="bolts" aria-labelledby="h-bolts">
+      <h2 id="h-bolts">Eccentrically loaded bolt group (shear)</h2>
+      <p class="hint">Centroid, primary and secondary shear, resultant per bolt and the critical bolt. x to the right, y up, moments counter-clockwise positive. mm and N.</p>
+      <form id="form-bolts" autocomplete="off" novalidate>
+        <fieldset>
+          <legend>Geometry and load</legend>
+          <div class="fields">
+            <div class="field wide"><label for="bo-pos">Bolt positions <span class="unit">(mm; one bolt per line: x, y or x, y, area)</span></label>
+              <textarea id="bo-pos" name="pos" rows="5" spellcheck="false" aria-describedby="bo-pos-hint">0, 0
+100, 0
+200, 0</textarea>
+              <span id="bo-pos-hint" class="hint">Leave out the area when all bolts are identical.</span></div>
+            <div class="field"><label for="bo-fx">Force Fx <span class="unit">(N)</span></label>
+              <input id="bo-fx" name="fx" type="number" step="any" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="bo-fy">Force Fy <span class="unit">(N)</span></label>
+              <input id="bo-fy" name="fy" type="number" step="any" inputmode="decimal" value="-6000"></div>
+            <div class="field"><label for="bo-x">Line of action: x <span class="unit">(mm)</span></label>
+              <input id="bo-x" name="x" type="number" step="any" inputmode="decimal" value="300"></div>
+            <div class="field"><label for="bo-y">Line of action: y <span class="unit">(mm)</span></label>
+              <input id="bo-y" name="y" type="number" step="any" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="bo-couple">Extra pure couple <span class="unit">(N&middot;mm, CCW +)</span></label>
+              <input id="bo-couple" name="couple" type="number" step="any" inputmode="decimal" value="0"></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Stresses (optional)</legend>
+          <div class="fields">
+            <div class="field"><label for="bo-d">Bolt diameter d <span class="unit">(mm)</span></label>
+              <input id="bo-d" name="d" type="number" step="any" min="0" inputmode="decimal" value="12"></div>
+            <div class="field"><label for="bo-t">Plate thickness t <span class="unit">(mm)</span></label>
+              <input id="bo-t" name="t" type="number" step="any" min="0" inputmode="decimal" value="10"></div>
+          </div>
+        </fieldset>
+        <div class="results" id="out-bolts" role="status" aria-live="polite"></div>
+      </form>
+      <details>
+        <summary>Equations</summary>
+        <pre>M = (xF - xbar) Fy - (yF - ybar) Fx + couple          (about the centroid)
+F'_i  = F A_i / sum(A)                                 (primary, direct)
+F''_i = M A_i r_i / sum(A_j r_j^2), perpendicular to r_i   (secondary)
+R_i   = F'_i + F''_i  (vector sum);  tau = R / (pi d^2 / 4);  sigma_b = R / (d t)</pre>
+      </details>
+    </section>
+
+  </main>
+
+  <footer>
+    <p><strong>Disclaimer.</strong> This is an educational tool. Check every result by hand and against the governing standards before using it for a real design. Not affiliated with the authors or publisher of any textbook.</p>
+    <p>MIT licence &middot; &copy; 2026 Yuroka Studio</p>
+  </footer>
+</div>
+
+<script type="module">
+  const loadError = document.getElementById('load-error');
+  try {
+    const lib = await import('./src/index.mjs');
+    init(lib);
+  } catch (error) {
+    console.error(error);
+    loadError.hidden = false;
+  }
+
+  function init(lib) {
+    /* ---------- small helpers ---------- */
+    const el = (tag, props = {}, ...kids) => {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (k === 'class') node.className = v;
+        else node.setAttribute(k, v);
+      }
+      node.append(...kids);
+      return node;
+    };
+    const fmt = (x, digits = 5) => {
+      if (x === Infinity) return '∞';
+      if (!Number.isFinite(x)) return '–';
+      return x.toLocaleString('en-US', { maximumSignificantDigits: digits });
+    };
+    const read = (form, name, label, { optional = false } = {}) => {
+      const raw = form.elements[name].value.trim();
+      if (raw === '') {
+        if (optional) return undefined;
+        throw new RangeError(`${label} is required`);
+      }
+      const value = Number(raw);
+      if (!Number.isFinite(value)) throw new RangeError(`${label} must be a number`);
+      return value;
+    };
+    const NM = 1000; // N*m -> N*mm
+
+    // A block is {rows, title} | {table:{head, body, highlight}, title} | {note}
+    const row = (symbol, label, value, unit = '', key = false) => ({ symbol, label, value, unit, key });
+
+    function renderRows(block) {
+      const body = el('tbody');
+      for (const r of block.rows) {
+        body.append(el('tr', r.key ? { class: 'key' } : {},
+          el('td', { class: 'sym' }, r.symbol),
+          el('td', {}, r.label),
+          el('td', { class: 'num' }, typeof r.value === 'number' ? fmt(r.value) : r.value),
+          el('td', {}, r.unit)));
+      }
+      const head = el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Symbol'), el('th', { scope: 'col' }, 'Quantity'),
+        el('th', { scope: 'col', class: 'num' }, 'Value'), el('th', { scope: 'col' }, 'Unit')));
+      const table = el('table', {}, ...(block.title ? [el('caption', {}, block.title)] : []), head, body);
+      return el('div', { class: 'scroll' }, table);
+    }
+
+    function renderTable(block) {
+      const head = el('thead', {}, el('tr', {},
+        ...block.table.head.map((h, i) => el('th', { scope: 'col', class: i === 0 ? '' : 'num' }, h))));
+      const body = el('tbody');
+      block.table.body.forEach((cells, i) => {
+        body.append(el('tr', i === block.table.highlight ? { class: 'critical' } : {},
+          ...cells.map((c, j) => el('td', { class: j === 0 ? '' : 'num' }, typeof c === 'number' ? fmt(c) : c))));
+      });
+      return el('div', { class: 'scroll' },
+        el('table', {}, ...(block.title ? [el('caption', {}, block.title)] : []), head, body));
+    }
+
+    function render(out, blocks) {
+      out.replaceChildren(...blocks.map((b) => {
+        if (b.note) return el('p', { class: 'note' }, b.note);
+        return b.table ? renderTable(b) : renderRows(b);
+      }));
+    }
+
+    function bind(name, compute) {
+      const form = document.getElementById(`form-${name}`);
+      const out = document.getElementById(`out-${name}`);
+      const run = () => {
+        try {
+          render(out, compute(form));
+        } catch (error) {
+          out.replaceChildren(el('p', { class: 'error' }, error instanceof RangeError ? error.message : `Unexpected error: ${error.message}`));
+        }
+      };
+      form.addEventListener('input', run);
+      form.addEventListener('change', run);
+      form.addEventListener('submit', (e) => { e.preventDefault(); run(); });
+      run();
+    }
+
+    const verdict = (n) => (n >= 1
+      ? el('span', { class: 'ok' }, `${fmt(n)} (n ≥ 1)`)
+      : el('span', { class: 'low' }, `${fmt(n)} (n < 1: fails)`));
+
+    /* ---------- 1. endurance limit ---------- */
+    let lastSe = null;
+    bind('endurance', (form) => {
+      const load = form.elements.load.value;
+      const shape = form.elements.shape.value;
+      const axial = load === 'axial';
+      form.querySelector('[data-size="shape"]').hidden = axial;
+      form.querySelector('[data-size="round"]').hidden = axial || shape === 'rectangle';
+      for (const f of form.querySelectorAll('[data-size="rect"]')) f.hidden = axial || shape !== 'rectangle';
+
+      const args = {
+        Sut: read(form, 'sut', 'Sut'),
+        finish: form.elements.finish.value,
+        load,
+        reliability: Number(form.elements.reliability.value),
+        tempC: read(form, 'temp', 'Temperature', { optional: true }),
+        kMisc: read(form, 'misc', 'kMisc'),
+      };
+      if (!axial) {
+        if (shape === 'rectangle') {
+          args.de = lib.equivalentDiameterRectangle(read(form, 'h', 'Depth h'), read(form, 'b', 'Width b'));
+        } else {
+          args.d = read(form, 'd', 'Diameter d');
+          args.rotating = shape === 'rotating';
+        }
+      }
+      const r = lib.enduranceLimit(args);
+      lastSe = r.Se;
+      const rows = [
+        row("Se'", 'Uncorrected endurance limit', r.SePrime, 'MPa'),
+        row('ka', 'Surface factor', r.ka),
+      ];
+      if (r.de !== null) rows.push(row('de', 'Effective diameter', r.de, 'mm'));
+      rows.push(
+        row('kb', 'Size factor', r.kb),
+        row('kc', 'Load factor', r.kc),
+        row('kd', 'Temperature factor', r.kd),
+        row('ke', 'Reliability factor', r.ke),
+        row('kMisc', 'Miscellaneous factor', r.kMisc),
+        row('Se', 'Corrected endurance limit', r.Se, 'MPa', true),
+      );
+      return [{ title: 'Marin factors', rows }];
+    });
+    document.getElementById('use-se').addEventListener('click', () => {
+      if (lastSe === null) return;
+      const target = document.getElementById('sf-se');
+      target.value = String(Number(lastSe.toPrecision(5)));
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      target.focus();
+    });
+
+    /* ---------- 2. fluctuating stress ---------- */
+    bind('fluctuating', (form) => {
+      const p = {
+        sigmaA: read(form, 'sa', 'σa'),
+        sigmaM: read(form, 'sm', 'σm'),
+        Se: read(form, 'se', 'Se'),
+        Sut: read(form, 'sut', 'Sut'),
+        Sy: read(form, 'sy', 'Sy'),
+      };
+      const n = lib.fluctuatingSafetyFactors(p);
+      const fatigue = [n.goodman, n.soderberg, n.gerber, n.asmeElliptic];
+      const governing = Math.min(...fatigue);
+      return [{
+        title: 'Factors of safety',
+        rows: [
+          row('n (Goodman)', '1/n = σa/Se + σm/Sut', verdict(n.goodman)),
+          row('n (Soderberg)', '1/n = σa/Se + σm/Sy', verdict(n.soderberg)),
+          row('n (Gerber)', 'parabola through Se and Sut', verdict(n.gerber)),
+          row('n (ASME)', 'ellipse through Se and Sy', verdict(n.asmeElliptic)),
+          row('n (Langer)', 'first-cycle yield, Sy/(σa + σm)', verdict(n.langer)),
+          row('min', 'Lowest of the four fatigue criteria', governing, '', true),
+        ],
+      }, { note: 'Goodman is the usual conservative design check; Soderberg is more conservative still; Gerber and ASME-elliptic track test data more closely. Langer checks yielding on the first load cycle.' }];
+    });
+
+    /* ---------- 3. static shaft ---------- */
+    bind('shaft-static', (form) => {
+      const M = (read(form, 'm', 'M', { optional: true }) ?? 0) * NM;
+      const T = (read(form, 't', 'T', { optional: true }) ?? 0) * NM;
+      const Sy = read(form, 'sy', 'Sy');
+      const n = read(form, 'n', 'Design factor n');
+      const sized = lib.staticShaftDiameter({ M, T, Sy, n });
+      const blocks = [{
+        title: 'Required diameter',
+        rows: [
+          row('√(4M²+3T²)', 'Combined load term', sized.combined, 'N·mm'),
+          row('d³', 'Required cube of the diameter', sized.d3, 'mm³'),
+          row('d', 'Minimum diameter', sized.d, 'mm', true),
+        ],
+      }];
+      const d = read(form, 'd', 'Diameter d', { optional: true });
+      if (d !== undefined) {
+        const c = lib.staticShaftSafetyFactor({ M, T, d, Sy });
+        blocks.push({
+          title: `At d = ${fmt(d)} mm`,
+          rows: [
+            row('σ', 'Bending stress 32M/(πd³)', c.sigma, 'MPa'),
+            row('τ', 'Torsional shear 16T/(πd³)', c.tau, 'MPa'),
+            row("σ'", 'Von Mises stress', c.sigmaPrime, 'MPa'),
+            row('n', 'Factor of safety Sy/σ′', verdict(c.n), '', true),
+          ],
+        });
+      }
+      return blocks;
+    });
+
+    /* ---------- 4. fatigue shaft ---------- */
+    bind('shaft-fatigue', (form) => {
+      const opt = (name, label) => (read(form, name, label, { optional: true }) ?? 0);
+      const loads = {
+        Ma: opt('ma', 'Ma') * NM,
+        Mm: opt('mm', 'Mm') * NM,
+        Ta: opt('ta', 'Ta') * NM,
+        Tm: opt('tm', 'Tm') * NM,
+        Kf: read(form, 'kf', 'Kf'),
+        Kfs: read(form, 'kfs', 'Kfs'),
+      };
+      const mat = { Se: read(form, 'se', 'Se'), Sut: read(form, 'sut', 'Sut'), Sy: read(form, 'sy', 'Sy') };
+      const n = read(form, 'n', 'Target design factor n');
+      const p = { ...loads, ...mat, n };
+      const g = lib.deGoodmanDiameter(p);
+      const s = lib.deSoderbergDiameter(p);
+      const ge = lib.deGerberDiameter(p);
+      const a = lib.deAsmeEllipticDiameter(p);
+      const blocks = [{
+        title: `Diameter for n = ${fmt(n)}`,
+        rows: [
+          row('A', '√(4(Kf·Ma)²+3(Kfs·Ta)²)', g.A / NM, 'N·m'),
+          row('B', '√(4(Kf·Mm)²+3(Kfs·Tm)²)', g.B / NM, 'N·m'),
+          row('d (DE-Goodman)', 'Usual default choice', g.d, 'mm', true),
+          row('d (DE-Soderberg)', 'Most conservative', s.d, 'mm'),
+          row('d (DE-Gerber)', 'Parabola', ge.d, 'mm'),
+          row('d (DE-ASME)', 'Ellipse', a.d, 'mm'),
+        ],
+      }, { note: 'Diameters assume the Se entered above. If Se comes from the Marin calculator, its size factor depends on d: use the library’s Se(d) function form to iterate (see the README).' }];
+      const d = read(form, 'd', 'Diameter d', { optional: true });
+      if (d !== undefined) {
+        const c = lib.shaftFatigueSafetyFactor({ ...loads, d, ...mat });
+        blocks.push({
+          title: `At d = ${fmt(d)} mm`,
+          rows: [
+            row("σa'", 'Von Mises alternating stress', c.sigmaAPrime, 'MPa'),
+            row("σm'", 'Von Mises mean stress', c.sigmaMPrime, 'MPa'),
+            row("σmax'", 'Von Mises stress at maximum load', c.sigmaMaxPrime, 'MPa'),
+            row('n (Goodman)', 'Fatigue', verdict(c.n.goodman), '', true),
+            row('n (Soderberg)', 'Fatigue', verdict(c.n.soderberg)),
+            row('n (Gerber)', 'Fatigue', verdict(c.n.gerber)),
+            row('n (ASME)', 'Fatigue', verdict(c.n.asmeElliptic)),
+            row('n (Langer)', 'Yield, Sy/(σa′ + σm′)', verdict(c.n.langer)),
+            row('n (yield)', 'First cycle, Sy/σmax′', verdict(c.n.yield)),
+          ],
+        });
+      }
+      return blocks;
+    });
+
+    /* ---------- 5. bolt group ---------- */
+    function parseBolts(text) {
+      const bolts = [];
+      text.split(/\r?\n/).forEach((line, i) => {
+        if (line.trim() === '') return;
+        const parts = line.trim().split(/[\s,;]+/).map(Number);
+        if ((parts.length !== 2 && parts.length !== 3) || parts.some((v) => !Number.isFinite(v))) {
+          throw new RangeError(`Bolt line ${i + 1}: expected "x, y" or "x, y, area" as numbers`);
+        }
+        const [x, y, area] = parts;
+        bolts.push(area === undefined ? { x, y } : { x, y, area });
+      });
+      return bolts;
+    }
+
+    bind('bolts', (form) => {
+      const bolts = parseBolts(form.elements.pos.value);
+      const load = {
+        Fx: read(form, 'fx', 'Fx', { optional: true }) ?? 0,
+        Fy: read(form, 'fy', 'Fy', { optional: true }) ?? 0,
+        x: read(form, 'x', 'Line of action x'),
+        y: read(form, 'y', 'Line of action y'),
+      };
+      const couple = read(form, 'couple', 'Couple', { optional: true }) ?? 0;
+      const r = lib.eccentricBoltGroup({ bolts, load, couple });
+      const d = read(form, 'd', 'Bolt diameter d', { optional: true });
+      const t = read(form, 't', 'Plate thickness t', { optional: true });
+      const showTau = d !== undefined;
+      const showBearing = d !== undefined && t !== undefined;
+
+      const head = ['Bolt', 'x (mm)', 'y (mm)', 'r (mm)', "F' (N)", "F'' (N)", 'R (N)'];
+      if (showTau) head.push('τ (MPa)');
+      if (showBearing) head.push('σb (MPa)');
+      head.push('');
+      const body = r.bolts.map((b) => {
+        const cells = [`#${b.index + 1}`, b.x, b.y, b.r, b.primary.magnitude, b.secondary.magnitude, b.resultant.magnitude];
+        if (showTau) cells.push(lib.boltShearStress(b.resultant.magnitude, d));
+        if (showBearing) cells.push(lib.boltBearingStress(b.resultant.magnitude, d, t));
+        cells.push(b.index === r.critical.index ? 'critical' : '');
+        return cells;
+      });
+      const crit = r.bolts[r.critical.index];
+      return [
+        {
+          title: 'Group properties',
+          rows: [
+            row('n', 'Number of bolts', r.count),
+            row('x̄', 'Centroid x', r.centroid.x, 'mm'),
+            row('ȳ', 'Centroid y', r.centroid.y, 'mm'),
+            row('F', 'Resultant applied force', Math.hypot(r.force.x, r.force.y), 'N'),
+            row('M', 'Moment about the centroid', r.moment, 'N·mm'),
+            row('ΣA r²', 'Polar moment of the bolt areas', r.sumAr2, 'mm² (area weights)'),
+          ],
+        },
+        { title: 'Per bolt', table: { head, body, highlight: r.critical.index } },
+        {
+          title: 'Critical bolt',
+          rows: [
+            row('#', 'Bolt number', `#${crit.index + 1}`),
+            row('Rx', 'Resultant, x component', crit.resultant.x, 'N'),
+            row('Ry', 'Resultant, y component', crit.resultant.y, 'N'),
+            row('R', 'Resultant magnitude', crit.resultant.magnitude, 'N', true),
+          ],
+        },
+      ];
+    });
+  }
+</script>
+</body>
+</html>

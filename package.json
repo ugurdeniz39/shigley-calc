@@ -1,0 +1,35 @@
+{
+  "name": "shigley-calc",
+  "version": "0.1.0",
+  "description": "Small, dependency-free machine-element calculators (Marin endurance limit, fatigue criteria, shaft diameter, eccentric bolt groups) using Shigley-style notation. For education.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "src",
+    "index.html",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "start": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "mechanical-engineering",
+    "machine-design",
+    "fatigue",
+    "shaft",
+    "bolt",
+    "marin",
+    "goodman"
+  ],
+  "author": "Yuroka Studio",
+  "license": "MIT"
+}
