@@ -31,5 +31,9 @@
     "goodman"
   ],
   "author": "Yuroka Studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yuroka-studio/shigley-calc.git"
+  },
   "license": "MIT"
 }
